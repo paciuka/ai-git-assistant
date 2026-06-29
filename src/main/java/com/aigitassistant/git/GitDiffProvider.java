@@ -7,15 +7,17 @@ import java.nio.charset.StandardCharsets;
 import java.util.stream.Collectors;
 
 /**
- * Responsible for executing the {@code git diff --staged} command
+ * Responsible for executing the {@code git diff --cached} command
  * and returning the raw diff output as a String.
  *
  * <p>Design notes:
  * <ul>
- *   <li>Uses {@link ProcessBuilder} instead of {@code Runtime.exec()} for
- *       better control over the subprocess environment.</li>
- *   <li>Redirects stderr so we can capture Git error messages
- *       (e.g., "not a git repository") and surface them clearly.</li>
+ *   <li>It uses {@code ProcessBuilder} which is preferred over
+ *       {@code Runtime.exec()} for better control over I/O.</li>
+ *   <li>It handles standard error streams to provide meaningful error
+ *       messages if {@code git diff --cached} fails.</li>
+ *   <li>It uses try-with-resources to ensure streams are properly closed,
+ *       preventing resource leaks.</li>
  *   <li>Throws descriptive, custom-message exceptions rather than
  *       returning null — fail fast, fail loud.</li>
  * </ul>
@@ -23,7 +25,7 @@ import java.util.stream.Collectors;
 public class GitDiffProvider {
 
     /**
-     * Executes {@code git diff --staged} in the current working directory
+     * Executes {@code git diff --cached} in the current working directory
      * and returns the diff output.
      *
      * @return the staged diff as a non-empty String
@@ -35,10 +37,11 @@ public class GitDiffProvider {
      */
     public String getStagedDiff() throws IOException, InterruptedException {
 
-        // --- 1. Build the process -------------------------------------------
-        // ProcessBuilder lets us configure the command, working directory,
-        // and stream redirection before launching.
-        ProcessBuilder processBuilder = new ProcessBuilder("git", "diff", "--staged");
+        // --- 1. Configure the ProcessBuilder --------------------------------
+        // "git diff --cached" shows changes added to the index (staged).
+        // We use --cached instead of --staged for maximum compatibility 
+        // with all Git versions.
+        ProcessBuilder processBuilder = new ProcessBuilder("git", "diff", "--cached");
 
         // Merge stderr into stdout so we can read ALL output from one stream.
         // Without this, if git writes to stderr (like "fatal: not a git repository"),

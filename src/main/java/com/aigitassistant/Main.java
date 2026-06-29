@@ -1,6 +1,8 @@
 package com.aigitassistant;
 
+import com.aigitassistant.ai.AiClient;
 import com.aigitassistant.ai.AnthropicClient;
+import com.aigitassistant.ai.GeminiClient;
 import com.aigitassistant.ai.PromptBuilder;
 import com.aigitassistant.config.AppConfig;
 import com.aigitassistant.git.GitDiffProvider;
@@ -14,10 +16,10 @@ import com.aigitassistant.model.CommitMessage;
  * components and orchestrates the pipeline:
  * <ol>
  *   <li>Load configuration (API key from env vars)</li>
- *   <li>Execute {@code git diff --staged} to capture changes</li>
+ *   <li>Execute {@code git diff --cached} to capture changes</li>
  *   <li>Build the prompt with the diff</li>
- *   <li>Send to Claude via the Anthropic API</li>
- *   <li>Parse the response and display the commit message</li>
+ *   <li>Send to the configured AI provider (Claude or Gemini)</li>
+ *   <li>Display the commit message</li>
  * </ol>
  *
  * <p>ANSI escape codes are used for colorful terminal output to
@@ -80,7 +82,7 @@ public class Main {
         printSuccess("API key loaded successfully.");
 
         // --- Step 2: Get the staged diff ------------------------------------
-        printStep("Reading staged changes (git diff --staged)...");
+        printStep("Reading staged changes (git diff --cached)...");
         GitDiffProvider gitDiffProvider = new GitDiffProvider();
         String diff = gitDiffProvider.getStagedDiff();
         long lineCount = diff.lines().count();
@@ -97,22 +99,25 @@ public class Main {
         printSuccess("Captured " + lineCount + " lines of staged changes.");
 
         // --- Step 3: Build the prompt ---------------------------------------
-        printStep("Constructing prompt for Claude...");
+        printStep("Constructing prompt for AI...");
         PromptBuilder promptBuilder = new PromptBuilder();
         String systemPrompt = promptBuilder.getSystemPrompt();
         String userPrompt = promptBuilder.buildUserPrompt(diff);
         printSuccess("Prompt ready.");
 
-        // --- Step 4: Send to Anthropic API ----------------------------------
-        printStep("Sending diff to Claude (" + config.getModel() + ")...");
-        AnthropicClient client = new AnthropicClient(config.getApiKey(), config.getModel());
-        String jsonResponse = client.sendMessage(systemPrompt, userPrompt);
-        printSuccess("Response received from Claude.");
+        // --- Step 4: Send to AI Provider ------------------------------------
+        printStep("Sending diff to " + config.getProviderDisplayName() + "...");
+        AiClient client = switch (config.getProvider()) {
+            case ANTHROPIC -> new AnthropicClient(config.getApiKey(), config.getModel());
+            case GEMINI -> new GeminiClient(config.getApiKey(), config.getModel());
+        };
+        
+        // The clients now parse the JSON internally and return the clean text
+        String messageText = client.sendMessage(systemPrompt, userPrompt);
+        printSuccess("Response received.");
 
-        // --- Step 5: Parse the response -------------------------------------
-        printStep("Parsing AI response...");
-        ApiResponseParser parser = new ApiResponseParser();
-        CommitMessage commitMessage = parser.parse(jsonResponse);
+        // --- Step 5: Process the response -----------------------------------
+        CommitMessage commitMessage = new CommitMessage(messageText);
 
         // --- Step 6: Display the result -------------------------------------
         printCommitMessage(commitMessage);
@@ -126,7 +131,7 @@ public class Main {
         System.out.println();
         System.out.println(CYAN + BOLD + "  ╔══════════════════════════════════════╗" + RESET);
         System.out.println(CYAN + BOLD + "  ║       🤖 AI Git Assistant            ║" + RESET);
-        System.out.println(CYAN + BOLD + "  ║   Smart Commits, Powered by Claude   ║" + RESET);
+        System.out.println(CYAN + BOLD + "  ║   Smart Commits, Powered by AI       ║" + RESET);
         System.out.println(CYAN + BOLD + "  ╚══════════════════════════════════════╝" + RESET);
         System.out.println();
     }
@@ -152,14 +157,15 @@ public class Main {
         System.out.println();
         System.out.println(BOLD + "  DESCRIPTION:" + RESET);
         System.out.println("    Analyzes staged Git changes and generates a professional");
-        System.out.println("    commit message using Claude AI (Conventional Commits format).");
+        System.out.println("    commit message using Claude or Gemini (Conventional Commits format).");
         System.out.println();
         System.out.println(BOLD + "  OPTIONS:" + RESET);
         System.out.println("    -h, --help    Show this help message and exit");
         System.out.println();
-        System.out.println(BOLD + "  ENVIRONMENT VARIABLES:" + RESET);
-        System.out.println(GREEN + "    ANTHROPIC_API_KEY" + RESET + "   (required) Your Anthropic API key");
-        System.out.println(DIM   + "    ANTHROPIC_MODEL" + RESET + "     (optional) Claude model (default: claude-sonnet-4-20250514)");
+        System.out.println(BOLD + "  ENVIRONMENT VARIABLES (Set ONE of these):" + RESET);
+        System.out.println(GREEN + "    ANTHROPIC_API_KEY" + RESET + "   Your Anthropic API key (for Claude)");
+        System.out.println(GREEN + "    GEMINI_API_KEY" + RESET + "      Your Google Gemini API key (Free tier)");
+        System.out.println(DIM   + "    AI_MODEL" + RESET + "            (optional) Override the default model");
         System.out.println();
         System.out.println(BOLD + "  EXAMPLE:" + RESET);
         System.out.println(CYAN + "    git add ." + RESET);

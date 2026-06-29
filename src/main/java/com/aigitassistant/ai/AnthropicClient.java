@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import com.aigitassistant.model.ApiResponseParser;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -26,12 +28,12 @@ import java.time.Duration;
  *   <li>The Gson instance is reused (thread-safe, immutable).</li>
  * </ul>
  */
-public class AnthropicClient {
+public class AnthropicClient implements AiClient {
 
     private static final String API_URL = "https://api.anthropic.com/v1/messages";
     private static final String API_VERSION = "2023-06-01";
     private static final int MAX_TOKENS = 1024;
-    private static final Duration TIMEOUT = Duration.ofSeconds(30);
+    private static final Duration TIMEOUT = Duration.ofSeconds(120);
 
     private final String apiKey;
     private final String model;
@@ -58,16 +60,17 @@ public class AnthropicClient {
     }
 
     /**
-     * Sends the system and user prompts to Claude and returns the raw
-     * JSON response body.
+     * Sends the system and user prompts to Claude and returns the
+     * generated commit message text.
      *
      * @param systemPrompt the system prompt defining Claude's behavior
      * @param userPrompt   the user prompt containing the diff
-     * @return the raw JSON response string from the Anthropic API
+     * @return the extracted commit message text
      * @throws IOException          if the HTTP request fails
      * @throws InterruptedException if the request is interrupted
      * @throws IllegalStateException if the API returns a non-2xx status code
      */
+    @Override
     public String sendMessage(String systemPrompt, String userPrompt)
             throws IOException, InterruptedException {
 
@@ -105,7 +108,9 @@ public class AnthropicClient {
             );
         }
 
-        return response.body();
+        // --- 5. Parse the response and extract the commit message text ------
+        ApiResponseParser parser = new ApiResponseParser();
+        return parser.parse(response.body()).message();
     }
 
     /**

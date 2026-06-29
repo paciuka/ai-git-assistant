@@ -30,7 +30,7 @@ public class PromptBuilder {
             Git commit messages following the Conventional Commits specification \
             (https://www.conventionalcommits.org/).
 
-            Your task: Analyze the provided `git diff --staged` output and generate \
+            Your task: Analyze the provided `git diff --cached` output and generate \
             a single, professional commit message.
 
             ## FORMAT RULES (strictly follow this structure):

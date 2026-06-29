@@ -1,30 +1,30 @@
 # 🤖 AI Git Assistant
 
-> A Java CLI tool that uses **Claude AI** to generate professional, semantic commit messages from your staged Git changes — following the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+> A Java CLI tool that uses **Claude AI / Google Gemini** to generate professional, semantic commit messages from your staged Git changes — following the [Conventional Commits](https://www.conventionalcommits.org/) specification.
 
 ![Java](https://img.shields.io/badge/Java-17+-orange?style=flat-square&logo=openjdk)
 ![Maven](https://img.shields.io/badge/Maven-3.9+-blue?style=flat-square&logo=apachemaven)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker)
-![Claude](https://img.shields.io/badge/Powered%20by-Claude%20AI-blueviolet?style=flat-square)
+![Claude & Gemini](https://img.shields.io/badge/Powered%20by-Claude%20%7C%20Gemini-blueviolet?style=flat-square)
 
 ---
 
 ## 📋 What It Does
 
-1. Captures your staged changes via `git diff --staged`
-2. Sends the diff to **Claude Sonnet 4** (Anthropic API)
-3. Claude analyzes the code and generates a **Conventional Commit** message
+1. Captures your staged changes via `git diff --cached`
+2. Sends the diff to your chosen AI provider (**Claude Sonnet ** or **Google Gemini**)
+3. The AI analyzes the code and generates a **Conventional Commit** message
 4. The message is displayed in your terminal, ready to copy
 
 ```
   ╔══════════════════════════════════════╗
   ║       🤖 AI Git Assistant            ║
-  ║   Smart Commits, Powered by Claude   ║
+  ║   Smart Commits, Powered by AI       ║
   ╚══════════════════════════════════════╝
 
   ⏳ Loading configuration...
   ✔ API key loaded successfully.
-  ⏳ Reading staged changes (git diff --staged)...
+  ⏳ Reading staged changes (git diff --cached)...
   ✔ Captured 42 lines of staged changes.
   ⏳ Sending diff to Claude (claude-sonnet-4-20250514)...
   ✔ Response received from Claude.
@@ -51,26 +51,27 @@
 ### Prerequisites
 
 - **Java 17+** — [Download](https://adoptium.net/)
-- **Maven 3.9+** — [Download](https://maven.apache.org/download.cgi)
 - **Git** — [Download](https://git-scm.com/)
-- **Anthropic API Key** — [Get one here](https://console.anthropic.com/)
+- **API Key** — You need ONE of the following:
+  - **Google Gemini** (Free tier) — [Get one here](https://aistudio.google.com/apikey)
+  - **Anthropic Claude** — [Get one here](https://console.anthropic.com/)
 
 ### Installation
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/ai-git-assistant.git
+git clone https://github.com/paciuka/ai-git-assistant.git
 cd ai-git-assistant
 
 # 2. Build the project (uses Maven Wrapper — no global Maven install needed)
 ./mvnw clean package      # Linux/macOS
 .\mvnw.cmd clean package  # Windows
 
-# 3. Set your API key (Linux/macOS)
-export ANTHROPIC_API_KEY=your-api-key-here
-
-# 3. Set your API key (Windows PowerShell)
-$env:ANTHROPIC_API_KEY="your-api-key-here"
+# 3. Set your API key (Choose One)
+# For Gemini (Free):
+export GEMINI_API_KEY="your-gemini-key"
+# OR for Claude:
+export ANTHROPIC_API_KEY="your-anthropic-key"
 
 # 4. Stage some changes and run
 git add .
@@ -83,8 +84,8 @@ java -jar target/ai-git-assistant-1.0.0.jar --help
 ### Optional: Custom Model
 
 ```bash
-# Use a different Claude model
-export ANTHROPIC_MODEL=claude-sonnet-4-20250514
+# Override the default model
+export AI_MODEL="gemini-1.5-pro"
 ```
 
 ---
@@ -101,7 +102,7 @@ docker build -t ai-git-assistant .
 # Mount the repo and pass the API key as an env variable
 docker run --rm \
   -v "$(pwd):/repo" \
-  -e ANTHROPIC_API_KEY=your-api-key-here \
+  -e GEMINI_API_KEY=your-api-key-here \
   ai-git-assistant
 ```
 
@@ -109,7 +110,7 @@ docker run --rm \
 ```powershell
 docker run --rm `
   -v "${PWD}:/repo" `
-  -e ANTHROPIC_API_KEY="your-api-key-here" `
+  -e GEMINI_API_KEY="your-api-key-here" `
   ai-git-assistant
 ```
 
@@ -123,25 +124,27 @@ The project follows **SOLID principles** with clear separation of concerns:
 com.aigitassistant/
 ├── Main.java                 # Composition root — wires all components
 ├── config/
-│   └── AppConfig.java        # Loads API key from environment variables
+│   └── AppConfig.java        # Loads API key and auto-detects AI provider
 ├── git/
-│   └── GitDiffProvider.java  # Executes `git diff --staged` via ProcessBuilder
+│   └── GitDiffProvider.java  # Executes `git diff --cached` via ProcessBuilder
 ├── ai/
-│   ├── PromptBuilder.java    # Crafts the system/user prompts for Claude
-│   └── AnthropicClient.java  # HTTP POST to Anthropic Messages API
+│   ├── AiClient.java         # Interface for Strategy Pattern (OCP)
+│   ├── AnthropicClient.java  # Claude implementation
+│   ├── GeminiClient.java     # Google Gemini implementation
+│   └── PromptBuilder.java    # Crafts the system/user prompts
 └── model/
     ├── CommitMessage.java    # Immutable record (Java 17 feature)
-    └── ApiResponseParser.java# Parses Claude's JSON response
+    └── ApiResponseParser.java# JSON parser helper
 ```
 
 ### Data Flow
 
 ```
-Environment Variables → AppConfig
-                           │
-git diff --staged → GitDiffProvider → PromptBuilder → AnthropicClient
+Environment Variables → AppConfig → (Detects Provider: Gemini/Claude)
+                                         │
+git diff --cached → GitDiffProvider → PromptBuilder → AiClient (Strategy)
                                                           │
-                               Terminal ← CommitMessage ← ApiResponseParser
+                               Terminal ← CommitMessage ← ┘
 ```
 
 ### Key Design Decisions
@@ -149,6 +152,7 @@ git diff --staged → GitDiffProvider → PromptBuilder → AnthropicClient
 | Decision | Rationale |
 |---|---|
 | **java.net.http.HttpClient** | Built into JDK 11+. Zero external dependencies for HTTP. |
+| **Strategy Pattern (AiClient)** | Open/Closed principle. Easily add new AI backends without modifying `Main`. |
 | **Gson** (single external dep) | Lightweight, no transitive dependencies. |
 | **ProcessBuilder** over Runtime.exec() | Better API, supports stream redirection, avoids deadlocks. |
 | **Java record** for CommitMessage | Immutable by design, auto-generates boilerplate. |
@@ -232,7 +236,16 @@ Before submitting the project, I used AI to perform a rigorous code review simul
 - **Robustness improvements:** Added content type validation in the response parser (protecting against `NullPointerException` if the API returns unexpected block types), and wrapped the `IOException` from `ProcessBuilder.start()` into a user-friendly error message when Git isn't installed.
 - **Prompt engineering fix:** The Javadoc claimed we used "few-shot examples" but the system prompt had none. We added concrete examples, which measurably improved output consistency.
 
-**What I learned:** AI code review catches a different class of bugs than manual review. I tend to focus on "does it work?" while the AI flagged production-readiness issues (resource leaks, security, edge cases) that only surface under unusual conditions.
+### Phase 6: Architecture Evolution (Open/Closed Principle)
+
+I realized users might not have a paid Anthropic account, so I wanted to add support for **Google Gemini** (which has a free tier). Because we laid a good foundation, this was extremely clean:
+- Created an `AiClient` interface (**Strategy Pattern**).
+- Made `AnthropicClient` implement it.
+- Created `GeminiClient` implementing the same interface.
+- Updated `AppConfig` to auto-detect the provider based on which environment variable is set (`GEMINI_API_KEY` vs `ANTHROPIC_API_KEY`).
+- `Main.java` didn't need its core pipeline modified at all — it just calls `AiClient.sendMessage()`.
+
+**What I learned:** This perfectly demonstrated the **Open/Closed Principle** (SOLID). The application was open for extension (adding Gemini) but closed for modification (the core pipeline remained identical).
 
 ---
 
