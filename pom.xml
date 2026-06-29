@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- ============================================================= -->
+    <!-- Project Coordinates                                           -->
+    <!-- ============================================================= -->
+    <groupId>com.aigitassistant</groupId>
+    <artifactId>ai-git-assistant</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>AI Git Assistant</name>
+    <description>
+        A CLI tool that uses Claude AI to generate professional,
+        semantic commit messages from staged Git changes.
+    </description>
+
+    <!-- ============================================================= -->
+    <!-- Properties                                                    -->
+    <!-- ============================================================= -->
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <gson.version>2.13.1</gson.version>
+        <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
+        <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
+    </properties>
+
+    <!-- ============================================================= -->
+    <!-- Dependencies                                                  -->
+    <!-- ============================================================= -->
+    <dependencies>
+        <!-- Gson — Lightweight JSON serialization/deserialization -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>${gson.version}</version>
+        </dependency>
+    </dependencies>
+
+    <!-- ============================================================= -->
+    <!-- Build Configuration                                           -->
+    <!-- ============================================================= -->
+    <build>
+        <plugins>
+            <!-- Maven Shade Plugin — creates a single executable "fat JAR"  -->
+            <!-- that bundles all dependencies, so the CLI can run with a    -->
+            <!-- simple `java -jar ai-git-assistant.jar` command.            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>${maven-shade-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <transformers>
+                                <!-- Sets the Main-Class in MANIFEST.MF so      -->
+                                <!-- `java -jar` knows which class to launch.    -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.aigitassistant.Main</mainClass>
+                                </transformer>
+                            </transformers>
+                            <!-- Produce a clean artifact name without the       -->
+                            <!-- "-shaded" suffix.                               -->
+                            <shadedArtifactAttached>false</shadedArtifactAttached>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
